@@ -166,8 +166,8 @@
       LASTV = 1
       LASTC = 0
       IF( TAU.NE.ZERO ) THEN
-!     Set up variables for scanning V.  LASTV begins pointing to the end
-!     of V up to V(1).
+!        Set up variables for scanning V.  LASTV begins pointing to the end
+!        of V up to V(1).
          IF( APPLYLEFT ) THEN
             LASTV = M
          ELSE
@@ -178,16 +178,16 @@
          ELSE
             I = 1
          END IF
-!     Look for the last non-zero row in V.
+!        Look for the last non-zero row in V.
          DO WHILE( LASTV.GT.1 .AND. V( I ).EQ.ZERO )
             LASTV = LASTV - 1
             I = I - INCV
          END DO
          IF( APPLYLEFT ) THEN
-!     Scan for the last non-zero column in C(1:lastv,:).
+!           Scan for the last non-zero column in C(1:lastv,:).
             LASTC = ILACLC(LASTV, N, C, LDC)
          ELSE
-!     Scan for the last non-zero row in C(:,1:lastv).
+!           Scan for the last non-zero row in C(:,1:lastv).
             LASTC = ILACLR(M, LASTV, C, LDC)
          END IF
       END IF
@@ -205,29 +205,32 @@
             CALL CSCAL( LASTC, ONE - TAU, C, LDC )
          ELSE
 *
-*        w(1:lastc,1) := C(2:lastv,1:lastc)**H * v(2:lastv,1)
+*           w(1:lastc,1) := C(2:lastv,1:lastc)**H * v(2:lastv,1)
 *
-         CALL CGEMV( 'Conjugate transpose', LASTV - 1, LASTC, ONE,
-     $               C( 2, 1 ), LDC, V( 1 + INCV ), INCV, ZERO,
-     $               WORK, 1 )
+            CALL CGEMV( 'Conjugate transpose', LASTV - 1, LASTC, ONE,
+     $                  C( 2, 1 ), LDC, V( 1 + INCV ), INCV, ZERO,
+     $                  WORK, 1 )
 *
-*        w(1:lastc,1) += v(1,1) * C(1,1:lastc)**H
+*           w(1:lastc,1) += v(1,1) * C(1,1:lastc)**H
 *
-         DO I = 1, LASTC
-            WORK( I ) = WORK( I ) + CONJG( C( 1, I ) )
-         END DO
+            DO I = 1, LASTC
+               WORK( I ) = WORK( I ) + CONJG( C( 1, I ) )
+            END DO
 *
-*        C(1, 1:lastc) += - tau * v(1,1) * w(1:lastc,1)**H
+*           C(1, 1:lastc) += - tau * v(1,1) * w(1:lastc,1)**H
+*           The parantheses around CONJG are necessary to prevent a
+*           compiler bug in gfortran 15.2 on aarch64. See
+*           https://github.com/Reference-LAPACK/lapack/issues/1160.
 *
-         DO I = 1, LASTC
-            C( 1, I ) = C( 1, I ) - TAU * CONJG( WORK( I ) )
-         END DO
+            DO I = 1, LASTC
+               C( 1, I ) = C( 1, I ) - TAU * ( CONJG( WORK( I ) ) )
+            END DO
 *
-*        C(2:lastv,1:lastc) += - tau * v(2:lastv,1) * w(1:lastc,1)**H
+*           C(2:lastv,1:lastc) += - tau * v(2:lastv,1) * w(1:lastc,1)**H
 *
-         CALL CGERC( LASTV - 1, LASTC, -TAU, V( 1 + INCV ), INCV,
-     $               WORK, 1, C( 2, 1 ), LDC )
-            END IF
+            CALL CGERC( LASTV - 1, LASTC, -TAU, V( 1 + INCV ), INCV,
+     $                  WORK, 1, C( 2, 1 ), LDC )
+         END IF
       ELSE
 *
 *        Form  C * H

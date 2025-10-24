@@ -170,24 +170,24 @@
       FIRSTV = 1
       LASTC = 0
       IF( TAU.NE.ZERO ) THEN
-!     Set up variables for scanning V.  LASTV begins pointing to the end
-!     of V up to V(1).
+!        Set up variables for scanning V.  LASTV begins pointing to the end
+!        of V up to V(1).
          IF( APPLYLEFT ) THEN
             LASTV = M
          ELSE
             LASTV = N
          END IF
          I = 1
-!     Look for the last non-zero row in V.
+!        Look for the last non-zero row in V.
          DO WHILE( LASTV.GT.FIRSTV .AND. V( I ).EQ.ZERO )
             FIRSTV = FIRSTV + 1
             I = I + INCV
          END DO
          IF( APPLYLEFT ) THEN
-!     Scan for the last non-zero column in C(1:lastv,:).
+!           Scan for the last non-zero column in C(1:lastv,:).
             LASTC = ILAZLC(LASTV, N, C, LDC)
          ELSE
-!     Scan for the last non-zero row in C(:,1:lastv).
+!           Scan for the last non-zero row in C(:,1:lastv).
             LASTC = ILAZLR(M, LASTV, C, LDC)
          END IF
       END IF
@@ -198,7 +198,7 @@
 *
 *        Form  H * C
 *
-         IF( LASTV.EQ.FIRSTV ) THEN        
+         IF( LASTV.EQ.FIRSTV ) THEN
 *
 *           C(lastv,1:lastc) := ( 1 - tau ) * C(lastv,1:lastc)
 *
@@ -214,14 +214,17 @@
 *           w(1:lastc,1) += C(lastv,1:lastc)**H * v(lastv,1)
 *
             DO J = 1, LASTC
-               WORK( J ) = WORK( J ) + CONJG( C( LASTV, J ) )
+               WORK( J ) = WORK( J ) + DCONJG( C( LASTV, J ) )
             END DO
 *
 *           C(lastv,1:lastc) += - tau * v(lastv,1) * w(1:lastc,1)**H
+*           The parantheses around DCONJG are necessary to prevent a
+*           compiler bug in gfortran 15.2 on aarch64. See
+*           https://github.com/Reference-LAPACK/lapack/issues/1160.
 *
             DO J = 1, LASTC
                C( LASTV, J ) = C( LASTV, J )
-     $                         - TAU * CONJG( WORK( J ) )
+     $                         - TAU * ( DCONJG( WORK( J ) ) )
             END DO
 *
 *           C(firstv:lastv-1,1:lastc) += - tau * v(firstv:lastv-1,1) * w(1:lastc,1)**H

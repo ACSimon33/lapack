@@ -130,7 +130,7 @@
 *
 *        C = [ C_1 C_2 ]
 *        C_1\in\mathbb{C}^{m\times 1}, C_2\in\mathbb{C}^{m\times n-1}
-*        So we compute: 
+*        So we compute:
 *        C = CH   = C(I - \tau vv**T)
 *                 = C - \tau Cvv**T
 *
@@ -178,7 +178,7 @@
 *     ..
 *     .. Local Scalars ..
       LOGICAL            APPLYLEFT
-      INTEGER            I, LASTV, LASTC, J
+      INTEGER            I, LASTV, LASTC
 *     ..
 *     .. External Subroutines ..
       EXTERNAL           ZAXPY, ZGEMV, ZGERC, ZSCAL
@@ -196,8 +196,8 @@
       LASTV = 1
       LASTC = 0
       IF( TAU.NE.ZERO ) THEN
-!     Set up variables for scanning V.  LASTV begins pointing to the end
-!     of V.
+!        Set up variables for scanning V.  LASTV begins pointing to the end
+!        of V up to V(1).
          IF( APPLYLEFT ) THEN
             LASTV = M
          ELSE
@@ -208,18 +208,18 @@
          ELSE
             I = 1
          END IF
-!     Look for the last non-zero row in V.
-!        Since we are assuming that V(1) = 1, and it is not stored, so we
-!        shouldn't access it.
+!        Look for the last non-zero row in V.
+!        Since we are assuming that V(1) = 1, and it is not stored,
+!        so we shouldn't access it.
          DO WHILE( LASTV.GT.1 .AND. V( I ).EQ.ZERO )
             LASTV = LASTV - 1
             I = I - INCV
          END DO
          IF( APPLYLEFT ) THEN
-!     Scan for the last non-zero column in C(1:lastv,:).
+!           Scan for the last non-zero column in C(1:lastv,:).
             LASTC = ILAZLC(LASTV, N, C, LDC)
          ELSE
-!     Scan for the last non-zero row in C(:,1:lastv).
+!           Scan for the last non-zero row in C(:,1:lastv).
             LASTC = ILAZLR(M, LASTV, C, LDC)
          END IF
       END IF
@@ -230,70 +230,76 @@
 *
 *        Form  H * C
 *
-            ! Check if m = 1. This means v = 1, So we just need to compute
-            ! C := HC = (1-\tau)C.
-            IF( LASTV.EQ.1 ) THEN
-               CALL ZSCAL(LASTC, ONE - TAU, C, LDC)
-            ELSE
+         ! Check if m = 1. This means v = 1, So we just need to compute
+         ! C := HC = (1-\tau)C.
+         IF( LASTV.EQ.1 ) THEN
 *
-*              w(1:lastc,1) := C(1:lastv,1:lastc)**H * v(1:lastv,1)
+*           C(1,1:lastc) := ( 1 - tau ) * C(1,1:lastc)
 *
-               ! (I - tvv**H)C = C - tvv**H C
-               ! First compute w**H = v**H c -> w = C**H v
-               ! C = [ C_1 C_2 ]**T, v = [1 v_2]**T
-               ! w = C_1**H + C_2**Hv_2
-               ! w = C_2**Hv_2
-               CALL ZGEMV( 'Conjugate transpose', LASTV - 1,
-     $               LASTC, ONE, C( 1+1, 1 ), LDC, V( 1 + INCV ),
-     $               INCV, ZERO, WORK, 1 )
+            CALL CSCAL( LASTC, ONE - TAU, C, LDC )
+         ELSE
 *
-*              w(1:lastc,1) += v(1,1) * C(1,1:lastc)**H
+*           w(1:lastc,1) := C(1:lastv,1:lastc)**H * v(1:lastv,1)
 *
-               DO I = 1, LASTC
-                  WORK( I ) = WORK( I ) + DCONJG( C( 1, I ) )
-               END DO
+            ! (I - tvv**H)C = C - tvv**H C
+            ! First compute w**H = v**H c -> w = C**H v
+            ! C = [ C_1 C_2 ]**T, v = [1 v_2]**T
+            ! w = C_1**H + C_2**Hv_2
+            ! w = C_2**Hv_2
+            CALL ZGEMV( 'Conjugate transpose', LASTV - 1, LASTC, ONE,
+     $                  C( 2, 1 ), LDC, V( 1 + INCV ), INCV, ZERO,
+     $                  WORK, 1 )
 *
-*           C(1:lastv,1:lastc) := C(...) - tau * v(1:lastv,1) * w(1:lastc,1)**H
+*           w(1:lastc,1) += v(1,1) * C(1,1:lastc)**H
 *
-            ! C(1, 1:lastc)   := C(...) - tau * v(1,1) * w(1:lastc,1)**H
-            !                  = C(...) - tau * Conj(w(1:lastc,1))
-            ! This is essentially a zaxpyc
-               DO I = 1, LASTC
-                  C( 1, I ) = C( 1, I ) - TAU * DCONJG( WORK( I ) )
-               END DO
+            DO I = 1, LASTC
+               WORK( I ) = WORK( I ) + DCONJG( C( 1, I ) )
+            END DO
 *
-*        C(2:lastv,1:lastc) += - tau * v(2:lastv,1) * w(1:lastc,1)**H
+*           C(1, 1:lastc) := C(...) - tau * v(1:lastv,1) * w(1:lastc,1)**H
+*                          = C(...) - tau * Conj(w(1:lastc,1))
+*           This is essentially a zaxpyc!
 *
-               CALL ZGERC( LASTV - 1, LASTC, -TAU, V( 1 + INCV ),
-     $               INCV, WORK, 1, C( 1+1, 1 ), LDC )
-            END IF
+*           The parantheses around DCONJG are necessary to prevent a
+*           compiler bug in gfortran 15.2 on aarch64. See
+*           https://github.com/Reference-LAPACK/lapack/issues/1160.
+*
+            DO I = 1, LASTC
+               C( 1, I ) = C( 1, I ) - TAU * ( DCONJG( WORK( I ) ) )
+            END DO
+*
+*           C(2:lastv,1:lastc) += - tau * v(2:lastv,1) * w(1:lastc,1)**H
+*
+            CALL ZGERC( LASTV - 1, LASTC, -TAU, V( 1 + INCV ), INCV,
+     $                  WORK, 1, C( 2, 1 ), LDC )
+         END IF
       ELSE
 *
 *        Form  C * H
 *
-            ! Check if n = 1. This means v = 1, so we just need to compute
-            ! C := CH = C(1-\tau).
-            IF( LASTV.EQ.1 ) THEN
-               CALL ZSCAL(LASTC, ONE - TAU, C, 1)
-            ELSE
+         ! Check if n = 1. This means v = 1, so we just need to compute
+         ! C := CH = C(1-\tau).
+         IF( LASTV.EQ.1 ) THEN
+            CALL ZSCAL(LASTC, ONE - TAU, C, 1)
+         ELSE
 *
-*              w(1:lastc,1) := C(1:lastc,1:lastv) * v(1:lastv,1)
+*           w(1:lastc,1) := C(1:lastc,2:lastv) * v(2:lastv,1)
 *
-               ! w(1:lastc,1) := C(1:lastc,2:lastv) * v(2:lastv,1)
-               CALL ZGEMV( 'No transpose', LASTC, LASTV-1, ONE, 
-     $            C(1,1+1), LDC, V(1+INCV), INCV, ZERO, WORK, 1 )
-               ! w(1:lastc,1) += C(1:lastc,1) v(1,1) = C(1:lastc,1)
-               CALL ZAXPY(LASTC, ONE, C, 1, WORK, 1)
+            CALL ZGEMV( 'No transpose', LASTC, LASTV - 1, ONE,
+     $                  C( 1, 2 ), LDC, V( 1 + INCV ), INCV, ZERO,
+     $                  WORK, 1 )
+            ! w(1:lastc,1) += C(1:lastc,1) v(1,1) = C(1:lastc,1)
+            CALL ZAXPY(LASTC, ONE, C, 1, WORK, 1)
 *
-*              C(1:lastc,1:lastv) := C(...) - tau * w(1:lastc,1) * v(1:lastv,1)**T
+*            C(1:lastc,1:lastv) := C(...) - tau * w(1:lastc,1) * v(1:lastv,1)**T
 *
-               ! C(1:lastc,1)     := C(...) - tau * w(1:lastc,1) * v(1,1)**T
-               !                   = C(...) - tau * w(1:lastc,1)
-               CALL ZAXPY(LASTC, -TAU, WORK, 1, C, 1)
-               ! C(1:lastc,2:lastv) := C(...) - tau * w(1:lastc,1) * v(2:lastv)**T
-               CALL ZGERC( LASTC, LASTV-1, -TAU, WORK, 1, V(1+INCV),
-     $                     INCV, C(1,1+1), LDC )
-            END IF
+            ! C(1:lastc,1)     := C(...) - tau * w(1:lastc,1) * v(1,1)**T
+            !                   = C(...) - tau * w(1:lastc,1)
+            CALL ZAXPY(LASTC, -TAU, WORK, 1, C, 1)
+            ! C(1:lastc,2:lastv) := C(...) - tau * w(1:lastc,1) * v(2:lastv)**T
+            CALL ZGERC( LASTC, LASTV - 1, -TAU, WORK, 1, V( 1 + INCV ),
+     $                  INCV, C( 1, 2 ), LDC )
+         END IF
       END IF
       RETURN
 *
