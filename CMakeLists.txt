@@ -398,51 +398,17 @@ endif()
 
 #-------------------------------------
 # BLAS++ / LAPACK++
-option(BLAS++ "Build BLAS++" OFF)
-option(LAPACK++ "Build LAPACK++" OFF)
+option(BLAS++ "Build BLAS++ (C++ API for BLAS)" OFF)
+option(LAPACK++ "Build LAPACK++ (C++ API for LAPACK)" OFF)
+message(STATUS "Build BLAS++: ${BLAS++}")
+message(STATUS "Build LAPACK++: ${LAPACK++}")
 
-
-function(_display_cpp_implementation_msg name)
-  string(TOLOWER ${name} name_lc)
-  message(STATUS "${name}++ enable")
-  message(STATUS "----------------")
-  message(STATUS "Thank you for your interest in ${name}++, a newly developed C++ API for ${name} library")
-  message(STATUS "The objective of ${name}++ is to provide a convenient, performance oriented API for development in the C++ language, that, for the most part, preserves established conventions, while, at the same time, takes advantages of modern C++ features, such as: namespaces, templates, exceptions, etc.")
-  message(STATUS "For support ${name}++ related question, please email: slate-user@icl.utk.edu")
-  message(STATUS "----------------")
-endfunction()
-if (BLAS++)
-  _display_cpp_implementation_msg("BLAS")
-  include(ExternalProject)
-  ExternalProject_Add(blaspp
-	  URL https://bitbucket.org/icl/blaspp/downloads/blaspp-2020.10.02.tar.gz
-	  CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env LIBRARY_PATH=$ENV{LIBRARY_PATH}:${CMAKE_BINARY_DIR}/lib LD_LIBRARY_PATH=$ENV{LD_LIBRARY_PATH}:${PROJECT_BINARY_DIR}/lib ${CMAKE_COMMAND} -DCMAKE_INSTALL_PREFIX=${PROJECT_BINARY_DIR} -DCMAKE_INSTALL_LIBDIR=lib -DBUILD_SHARED_LIBS=${BUILD_SHARED_LIBS} ${PROJECT_BINARY_DIR}/blaspp-prefix/src/blaspp
-	  BUILD_COMMAND ${CMAKE_COMMAND} -E env LIBRARY_PATH=$ENV{LIBRARY_PATH}:${PROJECT_BINARY_DIR}/lib LIB_SUFFIX="" ${CMAKE_COMMAND} --build .
-	  INSTALL_COMMAND ${CMAKE_COMMAND} -E env PREFIX=${PROJECT_BINARY_DIR} LIB_SUFFIX="" ${CMAKE_COMMAND} --install .
-	  )
-  ExternalProject_Add_StepDependencies(blaspp build ${BLAS_LIBRARIES})
+if(BLAS++ OR LAPACK++)
+  # LAPACK++ requires BLAS++, so it is built implicitly.
+  include(blaspp)
 endif()
-if (LAPACK++)
-	message (STATUS "linking lapack++ against ${LAPACK_LIBRARIES}")
-  _display_cpp_implementation_msg("LAPACK")
-  include(ExternalProject)
-  if (BUILD_SHARED_LIBS)
-  ExternalProject_Add(lapackpp
-	  URL https://bitbucket.org/icl/lapackpp/downloads/lapackpp-2020.10.02.tar.gz
-	  CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env LIBRARY_PATH=$ENV{LIBRARY_PATH}:${CMAKE_BINARY_DIR}/lib LD_LIBRARY_PATH=$ENV{LD_LIBRARY_PATH}:${PROJECT_BINARY_DIR}/lib ${CMAKE_COMMAND} -DCMAKE_INSTALL_PREFIX=${PROJECT_BINARY_DIR} -DCMAKE_INSTALL_LIBDIR=lib -DLAPACK_LIBRARIES=${LAPACK_LIBRARIES} -DBUILD_SHARED_LIBS=${BUILD_SHARED_LIBS}  ${PROJECT_BINARY_DIR}/lapackpp-prefix/src/lapackpp
-	  BUILD_COMMAND ${CMAKE_COMMAND} -E env LIBRARY_PATH=$ENV{LIBRARY_PATH}:${PROJECT_BINARY_DIR}/lib LIB_SUFFIX="" ${CMAKE_COMMAND} --build .
-	  INSTALL_COMMAND ${CMAKE_COMMAND} -E env PREFIX=${PROJECT_BINARY_DIR} LIB_SUFFIX="" ${CMAKE_COMMAND} --install .
-	  )
-  else ()
-# FIXME this does not really work as the libraries list gets converted to a semicolon-separated list somewhere in the lapack++ build files
-  ExternalProject_Add(lapackpp
-	  URL https://bitbucket.org/icl/lapackpp/downloads/lapackpp-2020.10.02.tar.gz
-	  CONFIGURE_COMMAND env LIBRARY_PATH=$ENV{LIBRARY_PATH}:${CMAKE_BINARY_DIR}/lib LD_LIBRARY_PATH=$ENV{LD_LIBRARY_PATH}:${PROJECT_BINARY_DIR}/lib ${CMAKE_COMMAND} -DCMAKE_INSTALL_PREFIX=${PROJECT_BINARY_DIR} -DCMAKE_INSTALL_LIBDIR=lib -DLAPACK_LIBRARIES="${PROJECT_BINARY_DIR}/lib/liblapack.a -lgfortran"  -DBUILD_SHARED_LIBS=${BUILD_SHARED_LIBS}  ${PROJECT_BINARY_DIR}/lapackpp-prefix/src/lapackpp
-	  BUILD_COMMAND env LIBRARY_PATH=$ENV{LIBRARY_PATH}:${PROJECT_BINARY_DIR}/lib LIB_SUFFIX="" ${CMAKE_COMMAND} --build .
-	  INSTALL_COMMAND ${CMAKE_COMMAND} -E env PREFIX=${PROJECT_BINARY_DIR} LIB_SUFFIX="" ${CMAKE_COMMAND} --install .
-  )
-  endif()
-  ExternalProject_Add_StepDependencies(lapackpp build blaspp ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
+if(LAPACK++)
+  include(lapackpp)
 endif()
 
 # --------------------------------------------------
@@ -553,50 +519,37 @@ install(FILES
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${LAPACKLIB}-${LAPACK_VERSION}
   COMPONENT Development
   )
-if (LAPACK++)
+if(BLAS++ OR LAPACK++)
+  # Install the staged blaspp/lapackpp trees: libraries, headers (including
+  # the generated defines.h files), CMake package files and pkg-config files.
+  # The staging tree mirrors the install layout (see CppAPIHelpers.cmake).
   install(
-  DIRECTORY "${LAPACK_BINARY_DIR}/lib/"
-  DESTINATION "${CMAKE_INSTALL_LIBDIR}${LAPACK_BINARY_PATH_SUFFIX}"
-  FILES_MATCHING REGEX "liblapackpp.(a|so)$"
+    DIRECTORY "${LAPACK_CPP_STAGING_DIR}/"
+    DESTINATION "."
+    USE_SOURCE_PERMISSIONS
+    OPTIONAL  # staging only exists once the blaspp/lapackpp targets are built
   )
-  install(
-    DIRECTORY "${PROJECT_BINARY_DIR}/lapackpp-prefix/src/lapackpp/include/"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-    FILES_MATCHING REGEX "\\.(h|hh)$"
-  )
-  write_basic_package_version_file(
-    "lapackppConfigVersion.cmake"
-    VERSION 2020.10.02
-    COMPATIBILITY AnyNewerVersion
-  )
-  install(
-    FILES "${CMAKE_CURRENT_BINARY_DIR}/lib/lapackpp/lapackppConfig.cmake"
-          "${CMAKE_CURRENT_BINARY_DIR}/lib/lapackpp/lapackppConfigVersion.cmake"
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/"
-  )
-
-endif()
-if (BLAS++)
-  write_basic_package_version_file(
-    "blasppConfigVersion.cmake"
-    VERSION 2020.10.02
-    COMPATIBILITY AnyNewerVersion
-  )
-  install(
-    FILES "${CMAKE_CURRENT_BINARY_DIR}/lib/blaspp/blasppConfig.cmake"
-          "${CMAKE_CURRENT_BINARY_DIR}/lib/blaspp/blasppConfigVersion.cmake"
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/"
-  )
-  install(
-  DIRECTORY "${LAPACK_BINARY_DIR}/lib/"
-  DESTINATION "${CMAKE_INSTALL_LIBDIR}${LAPACK_BINARY_PATH_SUFFIX}"
-  FILES_MATCHING REGEX "libblaspp.(a|so)$"
-  )
-  install(
-    DIRECTORY "${PROJECT_BINARY_DIR}/blaspp-prefix/src/blaspp/include/"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-    FILES_MATCHING REGEX "\\.(h|hh)$"
-  )
+  # The staged CMake package and pkg-config files reference the backend
+  # libraries by their build-tree paths; retarget them to the install tree.
+  # The globs cover the package-file locations of all supported blaspp and
+  # lapackpp versions (<libdir>/cmake/<name>, <libdir>/<name> before
+  # v2023.08.25, and <prefix>/<name> on Windows).
+  install(CODE "
+    file(GLOB_RECURSE _cpp_api_files
+      \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${LAPACK_CPP_LIBDIR}/cmake/*.cmake\"
+      \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${LAPACK_CPP_LIBDIR}/blaspp/*.cmake\"
+      \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${LAPACK_CPP_LIBDIR}/lapackpp/*.cmake\"
+      \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/blaspp/*.cmake\"
+      \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/lapackpp/*.cmake\"
+      \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${LAPACK_CPP_LIBDIR}/pkgconfig/*.pc\")
+    foreach(_file IN LISTS _cpp_api_files)
+      file(READ \"\${_file}\" _content)
+      string(REPLACE \"${LAPACK_BINARY_DIR}/lib\"
+                     \"\${CMAKE_INSTALL_PREFIX}/${LAPACK_CPP_LIBDIR}\"
+                     _content \"\${_content}\")
+      file(WRITE \"\${_file}\" \"\${_content}\")
+    endforeach()
+  ")
 endif()
 
 # --------------------------------------------------

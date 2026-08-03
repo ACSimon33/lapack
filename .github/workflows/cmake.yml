@@ -159,6 +159,52 @@ jobs:
       working-directory: ${{github.workspace}}/build
       run: ctest -C ${{env.BUILD_TYPE}} --schedule-random -j2 --output-on-failure --timeout 100
 
+  cpp-api:
+    # Build the BLAS++/LAPACK++ C++ APIs on top of the reference BLAS/LAPACK
+
+    runs-on: ubuntu-latest
+
+    env:
+      BUILD_TYPE: Release
+      FFLAGS: "-Wall -Wno-unused-dummy-argument -Wno-unused-variable -Wno-unused-label -Werror=conversion -fimplicit-none -frecursive -fcheck=all"
+
+    strategy:
+      fail-fast: false
+      matrix:
+        shared_libs: [ OFF, ON ]
+
+    steps:
+
+    - name: Checkout LAPACK
+      uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
+
+    - name: Install ninja-build tool
+      uses: seanmiddleditch/gha-setup-ninja@16b940825621068d98711680b6c3ff92201f8fc0 # v3
+
+    - name: Configure CMake
+      run: >
+        cmake -B build -G Ninja
+        -D CMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+        -D CMAKE_INSTALL_PREFIX=${{github.workspace}}/lapack_install
+        -D BUILD_SHARED_LIBS:BOOL=${{matrix.shared_libs}}
+        -D BLAS++:BOOL=ON
+        -D LAPACK++:BOOL=ON
+
+    - name: Build
+      run: cmake --build build
+
+    - name: Install
+      run: cmake --build build --target install -j2
+
+    - name: Check installed package files
+      # The installed CMake package and pkg-config files must not reference
+      # the build tree.
+      run: |
+        if grep -r "${{github.workspace}}/build" lapack_install/lib/cmake lapack_install/lib/pkgconfig; then
+          echo "ERROR: installed package files reference the build tree"
+          exit 1
+        fi
+
   coverage:
 
     runs-on: ubuntu-latest
