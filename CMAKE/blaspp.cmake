@@ -81,6 +81,9 @@ ExternalProject_Add(blaspp
   SOURCE_DIR "${blaspp_SOURCE_DIR}"
   DOWNLOAD_COMMAND ""
   UPDATE_COMMAND ""
+  # Plain cmake, or an env wrapper putting the backend DLLs on PATH for the
+  # configure-time probes on Windows (see CppAPIHelpers.cmake).
+  CMAKE_COMMAND ${LAPACK_CPP_CMAKE_COMMAND}
   LIST_SEPARATOR |
   # User arguments last: within the generated initial-cache file, later
   # set(... FORCE) calls win, so BLASPP_CMAKE_ARGS entries override ours.

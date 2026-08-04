@@ -18,14 +18,20 @@ if(CMAKE_VERSION VERSION_LESS 3.21)
     "their configure step may fail with CMake ${CMAKE_VERSION}")
 endif()
 
+# The blaspp/lapackpp configure steps run test executables linked against the
+# freshly built BLAS/LAPACK.  Windows has no RPATH, so those executables find
+# the DLLs in <build>/bin only through PATH: run the sub-builds through a
+# `cmake -E env --modify PATH=path_list_prepend:...` wrapper (the --modify
+# option requires CMake >= 3.25).
+set(LAPACK_CPP_CMAKE_COMMAND "${CMAKE_COMMAND}")
 if(WIN32 AND BUILD_SHARED_LIBS)
-  # The blaspp/lapackpp configure steps run test executables linked against
-  # the freshly built BLAS/LAPACK.  Windows has no RPATH, so those executables
-  # would not find the DLLs in <build>/bin.  (A future fix could wrap their
-  # configure command with
-  #   ${CMAKE_COMMAND} -E env --modify "PATH=path_list_prepend:${LAPACK_BINARY_DIR}/bin"
-  # which requires CMake >= 3.25.)
-  message(FATAL_ERROR "BLAS++/LAPACK++ are not supported on Windows with BUILD_SHARED_LIBS=ON")
+  if(CMAKE_VERSION VERSION_LESS 3.25)
+    message(FATAL_ERROR "BLAS++/LAPACK++ on Windows with BUILD_SHARED_LIBS=ON require CMake >= 3.25")
+  endif()
+  file(TO_NATIVE_PATH "${LAPACK_BINARY_DIR}/bin" _lapack_cpp_dll_dir)
+  set(LAPACK_CPP_CMAKE_COMMAND
+    ${CMAKE_COMMAND} -E env --modify "PATH=path_list_prepend:${_lapack_cpp_dll_dir}"
+    ${CMAKE_COMMAND})
 endif()
 
 if(WIN32)
