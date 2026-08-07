@@ -5,31 +5,31 @@ on:
     branches:
     - master
     - try-github-actions
-    paths:
-    - .github/workflows/makefile.yml
-    - '**Makefile'
-    - 'BLAS/**'
-    - 'CBLAS/**'
-    - 'INSTALL/**'
-    - 'LAPACKE/**'
-    - 'SRC/**'
-    - 'TESTING/**'
-    - '!**README'
-    - '!**CMakeLists.txt'
-    - '!**md'
-  pull_request:
-    paths:
-    - .github/workflows/makefile.yml
-    - '**Makefile'
-    - 'BLAS/**'
-    - 'CBLAS/**'
-    - 'INSTALL/**'
-    - 'LAPACKE/**'
-    - 'SRC/**'
-    - 'TESTING/**'
-    - '!**README'
-    - '!**CMakeLists.txt'
-    - '!**md'
+    # paths:
+    # - .github/workflows/makefile.yml
+    # - '**Makefile'
+    # - 'BLAS/**'
+    # - 'CBLAS/**'
+    # - 'INSTALL/**'
+    # - 'LAPACKE/**'
+    # - 'SRC/**'
+    # - 'TESTING/**'
+    # - '!**README'
+    # - '!**CMakeLists.txt'
+    # - '!**md'
+  # pull_request:
+  #   paths:
+  #   - .github/workflows/makefile.yml
+  #   - '**Makefile'
+  #   - 'BLAS/**'
+  #   - 'CBLAS/**'
+  #   - 'INSTALL/**'
+  #   - 'LAPACKE/**'
+  #   - 'SRC/**'
+  #   - 'TESTING/**'
+  #   - '!**README'
+  #   - '!**CMakeLists.txt'
+  #   - '!**md'
 
 permissions:
   contents: read
